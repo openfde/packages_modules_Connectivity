@@ -2323,7 +2323,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
                 ? mDeps.makeMultiProxyTracker(mContext, mHandler)
                 : mDeps.makeProxyTracker(mContext, mHandler);
 
-        if (mDeps.isAtLeastB()) {
+        if (false && mDeps.isAtLeastB()) {
             mLocalNetEventListener = mDeps.getLocalNetEventListener(
                     mContext,
                     mHandler.getLooper(),

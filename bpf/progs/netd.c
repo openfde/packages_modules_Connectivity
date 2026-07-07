@@ -1190,10 +1190,10 @@ DEFINE_NETD_T_BPF_PROG_KVER(cgroupsock, inet_create, 5_10)
     return inet_socket_create(sk, KVER_5_10);
 }
 
-DEFINE_NETD_T_BPF_PROG_KVER_RANGE(cgroupsock, inet_create, 4_14, 5_10)
-(struct bpf_sock* sk) {
-    return inet_socket_create(sk, KVER_4_14);
-}
+//DEFINE_NETD_T_BPF_PROG_KVER_RANGE(cgroupsock, inet_create, 4_14, 5_10)
+//(struct bpf_sock* sk) {
+//    return inet_socket_create(sk, KVER_4_14);
+//}
 
 DEFINE_NETD_T_BPF_PROG_KVER(cgroupsockrelease, inet_release, 5_10)
 (struct bpf_sock* sk) {
@@ -1311,23 +1311,23 @@ DEFINE_NETD_T_BPF_PROG_KVER(bind4, inet4_bind, 5_15)
     return inet_bind(ctx, KVER_5_15);
 }
 
-DEFINE_NETD_T_BPF_PROG_KVER_RANGE(bind4, inet4_bind, 4_19, 5_15)
-(struct bpf_sock_addr *ctx) {
-    return inet_bind(ctx, KVER_4_19);
-}
+//DEFINE_NETD_T_BPF_PROG_KVER_RANGE(bind4, inet4_bind, 4_19, 5_15)
+//(struct bpf_sock_addr *ctx) {
+//    return inet_bind(ctx, KVER_4_19);
+//}
 
 DEFINE_NETD_T_BPF_PROG_KVER(bind6, inet6_bind, 5_15)
 (struct bpf_sock_addr *ctx) {
     return inet_bind(ctx, KVER_5_15);
 }
 
-DEFINE_NETD_T_BPF_PROG_KVER_RANGE(bind6, inet6_bind, 4_19, 5_15)
-(struct bpf_sock_addr *ctx) {
-    return inet_bind(ctx, KVER_4_19);
-}
+//DEFINE_NETD_T_BPF_PROG_KVER_RANGE(bind6, inet6_bind, 4_19, 5_15)
+//(struct bpf_sock_addr *ctx) {
+//    return inet_bind(ctx, KVER_4_19);
+//}
 
 // --- CONNECT CGROUP HOOKS ---
-
+/*
 DEFINE_NETD_BPF_PROG_RANGES(connect4, inet4_connect, 4_19, INF, V, MAXAPI)
 (__unused struct bpf_sock_addr *ctx) {
     return BPF_ALLOW;
@@ -1361,7 +1361,7 @@ DEFINE_NETD_BPF_PROG_RANGES(sendmsg6, udp6_sendmsg, 4_19, INF, V, MAXAPI)
 (__unused struct bpf_sock_addr *ctx) {
     return BPF_ALLOW;
 }
-
+*/
 // --- GETSOCKOPT HOOK ---
 
 function int inet_getsockopt(struct bpf_sockopt *ctx,
@@ -1431,10 +1431,10 @@ DEFINE_NETD_BPF_PROG_RANGES(getsockopt, prog, 5_10, 6_1, V, MAXAPI)
     return inet_getsockopt(ctx, KVER_5_10, API(V));
 }
 
-DEFINE_NETD_BPF_PROG_RANGES(getsockopt, prog, 5_4, 5_10, V, MAXAPI)
-(struct bpf_sockopt *ctx) {
-    return inet_getsockopt(ctx, KVER_5_4, API(V));
-}
+//DEFINE_NETD_BPF_PROG_RANGES(getsockopt, prog, 5_4, 5_10, V, MAXAPI)
+//(struct bpf_sockopt *ctx) {
+//    return inet_getsockopt(ctx, KVER_5_4, API(V));
+//}
 
 // --- SETSOCKOPT HOOK ---
 
@@ -1489,9 +1489,9 @@ DEFINE_NETD_BPF_PROG_RANGES(setsockopt, prog, 5_10, 6_1, V, MAXAPI)
     return inet_setsockopt(ctx, KVER_5_10, API(V));
 }
 
-DEFINE_NETD_BPF_PROG_RANGES(setsockopt, prog, 5_4, 5_10, V, MAXAPI)
-(struct bpf_sockopt *ctx) {
-    return inet_setsockopt(ctx, KVER_5_4, API(V));
-}
+//DEFINE_NETD_BPF_PROG_RANGES(setsockopt, prog, 5_4, 5_10, V, MAXAPI)
+//(struct bpf_sockopt *ctx) {
+//    return inet_setsockopt(ctx, KVER_5_4, API(V));
+//}
 
 LICENSE("Apache 2.0");

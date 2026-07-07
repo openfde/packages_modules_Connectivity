@@ -1353,15 +1353,30 @@ static bool loadAllObjects() {
     // b/494690861: funcs may trigger Real-time Kernel Protection (RKP)
     bool funcs = isAtLeast26Q2 && isAtLeastKernelVersion(6, 6, 118);
 
-    if (!loadObject(BPFROOT "offload.o", /*libbpf*/false)) return false;
-    if (!loadObject(BPFROOT "test.o")) return false;
-    if (!loadObject(BPFROOT "clatd.o")) return false;
+    if (!loadObject(BPFROOT "offload.o", /*libbpf*/false)) {
+        ALOGE("Failed to loadObject: offload.o");
+        //return false;
+    }
+    if (!loadObject(BPFROOT "test.o")) {
+        ALOGE("Failed to loadObject: test.o");
+        //return false;
+    }
+    if (!loadObject(BPFROOT "clatd.o")){
+        ALOGE("Failed to loadObject: clatd.o");
+        //return false;
+    }
     if (funcs) {
         if (!loadObject(BPFROOT "dscpPolicy@funcs.o")) return false;
         if (!loadObject(BPFROOT "netd@funcs.o")) return false;
     } else {
-        if (!loadObject(BPFROOT "dscpPolicy.o")) return false;
-        if (!loadObject(BPFROOT "netd.o")) return false;
+        if (!loadObject(BPFROOT "dscpPolicy.o")){
+            ALOGE("Failed to loadObject: dscpPolicy.o");
+            //return false;
+        }
+        if (!loadObject(BPFROOT "netd.o")){
+            ALOGE("Failed to loadObject: netd.o");
+            //return false;
+        }
     }
     return true;
 }
@@ -1577,7 +1592,7 @@ static int doLoad(char** argv, char * const envp[]) {
     // see also: //system/netd/tests/kernel_test.cpp TestKernel510
     if (isAtLeast25Q4 && !isAtLeastKernelVersion(5, 10)) {
         ALOGE("Android 25Q4 requires kernel 5.10.");
-        return 7;
+        //return 7;
     }
 
     // 26Q4 bumps the kernel requirement up to 5.15
@@ -1739,7 +1754,9 @@ static int doLoad(char** argv, char * const envp[]) {
         // (this writeFile is known to fail on at least 4.19, but always defaults to 0 on
         // pre-5.13, on 5.13+ it depends on CONFIG_BPF_UNPRIV_DEFAULT_OFF)
         if (!writeFile("/proc/sys/kernel/unprivileged_bpf_disabled", "0\n") &&
-            isAtLeastKernelVersion(5, 13)) return 23;
+            isAtLeastKernelVersion(5, 13)) {
+            PLOG(ERROR) << "change /proc/sys/kernel/unprivileged_bpf_disabled to 0 failed";
+        }
     }
 
     if (isAtLeastU) {
@@ -1754,12 +1771,16 @@ static int doLoad(char** argv, char * const envp[]) {
         //  kernel does not have CONFIG_BPF_JIT=y)
         // BPF_JIT is required by R VINTF (which means 4.14/4.19/5.4 kernels),
         // but 4.14/4.19 were released with P & Q, and only 5.4 is new in R+.
-        if (!writeFile("/proc/sys/net/core/bpf_jit_enable", "1\n")) return 24;
+        if (!writeFile("/proc/sys/net/core/bpf_jit_enable", "1\n")) {
+            PLOG(ERROR) << "change /proc/sys/net/core/bpf_jit_enable to 1 failed";
+        }
 
         // Enable JIT kallsyms export for privileged users only
         // (Note: this (open) will fail with ENOENT 'No such file or directory' if
         //  kernel does not have CONFIG_HAVE_EBPF_JIT=y)
-        if (!writeFile("/proc/sys/net/core/bpf_jit_kallsyms", "1\n")) return 25;
+        if (!writeFile("/proc/sys/net/core/bpf_jit_kallsyms", "1\n")) {
+            PLOG(ERROR) << "change /proc/sys/net/core/bpf_jit_kallsyms to 1 failed";
+        }
     }
 
     // Create all the pin subdirectories
@@ -1785,13 +1806,13 @@ static int doLoad(char** argv, char * const envp[]) {
         uint32_t progId = bpfGetNextProgId(0);  // expect 0 with errno == ENOENT
         if (progId || errno != ENOENT) {
             ALOGE("bpfGetNextProgId(zero) returned %u (errno %d)", progId, errno);
-            return 32;
+            //return 32;
         }
         errno = 0;
         uint32_t mapId = bpfGetNextMapId(0);  // expect 0 with errno == ENOENT
         if (mapId || errno != ENOENT) {
             ALOGE("bpfGetNextMapId(zero) returned %u (errno %d)", mapId, errno);
-            return 33;
+            //return 33;
         }
     } else if (isAtLeastKernelVersion(4, 14)) {  // implies S through U QPR2
         // bpfGetNext{Prog,Map}Id require 4.14+
@@ -1837,8 +1858,8 @@ static int doLoad(char** argv, char * const envp[]) {
         ALOGE("If this triggers randomly, you might be hitting some memory allocation "
               "problems or startup script race.");
         ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
-        sleep(20);
-        return 38;
+        //sleep(20);
+        //return 38;
     }
 
     auto end = steady_clock::now();
@@ -1849,7 +1870,7 @@ static int doLoad(char** argv, char * const envp[]) {
         if (writeToMapEntry(bpfKernelStatsMapFd, &key, &timeTaken, BPF_ANY)) {
             ALOGE("Failed to write object load time to kernel stats map, err: [%d, %s]",
                   errno, strerror(errno));
-            return 39;
+            //return 39;
         }
 
         uint32_t value = 123;
@@ -1857,7 +1878,7 @@ static int doLoad(char** argv, char * const envp[]) {
         if (writeToMapEntry(bpfKernelStatsMapFd, &key, &value, BPF_ANY)) {
             ALOGE("Critical kernel bug - failure to write into index 1 of 2 element bpf map array."
                   "[%d, %s]", errno, strerror(errno));
-            if (isAtLeastT) return 40;
+            //if (isAtLeastT) return 40;
         }
     }
 

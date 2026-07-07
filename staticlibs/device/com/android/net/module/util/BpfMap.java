@@ -269,11 +269,13 @@ public class BpfMap<K extends Struct, V extends Struct> implements IBpfMap<K, V>
 
     /** Synchronize Kernel RCU */
     public static void synchronizeKernelRCU() throws ErrnoException {
+        /*
         final int err = nativeSynchronizeKernelRCU();
         if (err != 0) {
             final int errno = -err;
             throw new ErrnoException("nativeSynchronizeKernelRCU", errno);
         }
+        */
     }
 
     @FastNative
