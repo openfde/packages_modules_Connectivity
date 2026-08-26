@@ -21,6 +21,7 @@ import static android.net.EthernetManager.ETHERNET_STATE_ENABLED;
 import static android.net.NetworkCapabilities.TRANSPORT_ETHERNET;
 import static android.net.NetworkCapabilities.TRANSPORT_LOWPAN;
 import static android.net.NetworkCapabilities.TRANSPORT_VPN;
+import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI_AWARE;
 import static android.net.TestNetworkManager.TEST_TAP_PREFIX;
 import static android.net.EthernetManager.TEST_INTERFACE_MODE_NONE;
@@ -45,6 +46,7 @@ import android.net.LinkAddress;
 import android.net.MacAddress;
 import android.net.NetworkCapabilities;
 import android.net.StaticIpConfiguration;
+import android.openfde.Net;
 import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.RemoteCallbackList;
@@ -126,7 +128,7 @@ public class EthernetTracker {
 
     @VisibleForTesting
     public static final NetworkCapabilities DEFAULT_CAPABILITIES = new NetworkCapabilities.Builder()
-                        .addTransportType(TRANSPORT_ETHERNET)
+                        .addTransportType(TRANSPORT_WIFI)
                         .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED)
                         .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
@@ -181,6 +183,8 @@ public class EthernetTracker {
     private boolean mTetheredInterfaceWasAvailable = false;
     // Tracks the current state of ethernet as configured by EthernetManager#setEthernetEnabled.
     private boolean mIsEthernetEnabled = true;
+
+    private Net net = Net.getInstance(null);
 
     private class TetheredInterfaceRequestList extends
             RemoteCallbackList<ITetheredInterfaceCallback> {
@@ -259,7 +263,15 @@ public class EthernetTracker {
                 if (trackingReason.isEmpty()) return;
 
                 Log.i(TAG, "onInterfaceAdded: " + port + " for reason: " + trackingReason);
-                trackInterface(port, trackingReason);
+                //like usb wifi/ethernet,interface name maybe rename, such "eth0"->"enx112233445566",
+                //"wlan0"->"wlx112233445566", when hotplug;case we no chance to addInterface for rename's
+                if (linkUp && (net.ipConfiged(ifname) == 1)) {
+                    updateConfigStore(ifname);
+                    trackInterface(port, trackingReason);
+                } else if (linkUp && (net.ipConfiged(ifname) == 0)) {
+                    Log.i(TAG, "linkUp but not ipConfiged!!");
+                    return;
+                }
             }
             Log.i(TAG, "interfaceLinkStateChanged: " + port + ", up: " + linkUp);
             updateInterfaceState(port, linkUp);
@@ -289,6 +301,9 @@ public class EthernetTracker {
             // (for existing interfaces). Up until then, this code runs for every network interface
             // on the system.
             final String ifname = msg.getInterfaceName();
+            if (!isValidEthernetInterface(ifname)) {
+               return;
+            }
             final EthernetPort port = new EthernetPort(ifname, mac, ifinfomsg.index);
 
             switch (msg.getHeader().nlmsg_type) {
@@ -335,6 +350,7 @@ public class EthernetTracker {
         mNetd = netd;
         mDeps = deps;
 
+        /*
         // Interface match regex.
         String ifaceMatchRegex = mDeps.getInterfaceRegexFromResource(mContext);
         // "*" is a magic string to indicate "pick the default".
@@ -354,14 +370,17 @@ public class EthernetTracker {
         for (String strConfig : interfaceConfigs) {
             parseEthernetConfig(strConfig);
         }
+        */
 
+        mIfaceMatch = Pattern.compile("(usb|eth)\\d+");
         mConfigStore = new EthernetConfigStore();
         mNetlinkMonitor = new EthernetNetlinkMonitor(mHandler);
     }
 
     void start() {
         mFactory.register();
-        mConfigStore.read();
+        //mConfigStore.read();
+        mConfigStore.constructIpConfigurations();
 
         final ArrayMap<String, IpConfiguration> configs = mConfigStore.getIpConfigurations();
         for (int i = 0; i < configs.size(); i++) {
@@ -788,6 +807,13 @@ public class EthernetTracker {
         cb.onResult(iface);
     }
 
+    private void updateConfigStore(String iface) {
+        IpConfiguration config = mConfigStore.getIpConfiguration(iface);
+        if (config != null) {
+            writeIpConfiguration(iface, config);
+        }
+    }
+
     private void updateInterfaceState(EthernetPort port, boolean up) {
         final String iface = port.getInterfaceName();
         final int mode = getInterfaceMode(iface);
@@ -882,7 +908,7 @@ public class EthernetTracker {
      */
     private EnumSet<TrackingReason> inferTrackingReason(String iface) {
         final EnumSet<TrackingReason> reasons = EnumSet.noneOf(TrackingReason.class);
-        if (mIfaceMatch.matcher(iface).matches()) {
+        if (isValidEthernetInterface(iface)) {
             reasons.add(TrackingReason.REGEX);
         }
 
@@ -977,6 +1003,10 @@ public class EthernetTracker {
                 up ? IFF_UP : ~IFF_UP)) {
             Log.e(TAG, "Failed to set interface " + interfaceName + (up ? " up" : " down"));
         }
+    }
+
+    private boolean isValidEthernetInterface(String iface) {
+        return net.getLansWlansBridges().contains(iface) || isValidTestInterface(iface);
     }
 
     void dump(FileDescriptor fd, IndentingPrintWriter pw, String[] args) {
