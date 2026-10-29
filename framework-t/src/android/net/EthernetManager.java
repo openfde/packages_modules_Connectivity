@@ -19,6 +19,7 @@ package android.net;
 import static android.annotation.SystemApi.Client.MODULE_LIBRARIES;
 
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -34,9 +35,11 @@ import android.util.ArrayMap;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.modules.utils.BackgroundThread;
+import com.android.tethering.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -206,6 +209,50 @@ public class EthernetManager {
     public void setConfiguration(@NonNull String iface, @NonNull IpConfiguration config) {
         try {
             mService.setConfiguration(iface, config);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Set DNS servers for the given ethernet interface, without touching the rest of its
+     * configuration.
+     *
+     * The new servers take effect immediately if the interface currently has a connected
+     * network, and are persisted so they survive reboots and network reprovisioning.
+     *
+     * @param iface name of the interface, e.g. eth0.
+     * @param servers list of DNS server IP addresses, must not be empty.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ETHERNET_SET_DNS_SERVERS)
+    @RequiresPermission(android.Manifest.permission.NETWORK_SETTINGS)
+    public void setDnsServers(@NonNull String iface, @NonNull List<String> servers) {
+        try {
+            mService.setDnsServers(iface, servers);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Get DNS servers for the given ethernet interface.
+     *
+     * @param iface name of the interface, e.g. eth0.
+     * @return current resolver DNS server IP addresses when the interface is connected; otherwise
+     * persisted DNS server addresses for the interface. Returns an empty list if no DNS
+     * servers are available.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ETHERNET_SET_DNS_SERVERS)
+    @RequiresPermission(android.Manifest.permission.NETWORK_SETTINGS)
+    @NonNull
+    public List<String> getDnsServers(@NonNull String iface) {
+        try {
+            final List<String> servers = mService.getDnsServers(iface);
+            return servers == null ? Collections.emptyList() : servers;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

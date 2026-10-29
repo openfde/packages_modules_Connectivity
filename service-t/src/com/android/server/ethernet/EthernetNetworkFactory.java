@@ -35,6 +35,7 @@ import android.net.IpConfiguration;
 import android.net.IpConfiguration.IpAssignment;
 import android.net.IpConfiguration.ProxySettings;
 import android.net.LinkProperties;
+import android.net.Network;
 import android.net.NetworkAgentConfig;
 import android.net.NetworkCapabilities;
 import android.net.NetworkProvider;
@@ -61,7 +62,9 @@ import com.android.server.connectivity.ConnectivityResources;
 import com.android.server.ethernet.EthernetTracker.TrackingReason;
 
 import java.io.FileDescriptor;
+import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -258,6 +261,52 @@ public class EthernetNetworkFactory {
      */
     public boolean hasInterface(String ifaceName) {
         return mTrackingInterfaces.containsKey(ifaceName);
+    }
+
+    /**
+     * Returns the netId of the network currently running on the given interface, or -1 if
+     * the interface is not tracked or has no connected network.
+     */
+    int getNetId(@NonNull final String iface) {
+        final NetworkInterfaceState state = mTrackingInterfaces.get(iface);
+        if (state == null || state.mNetworkAgent == null) return -1;
+        final Network network = state.mNetworkAgent.getNetwork();
+        return network == null ? -1 : network.netId;
+    }
+
+    /**
+     * Update the DNS servers in the current LinkProperties of the given interface and, if a
+     * network is connected, notify ConnectivityService so that the DNS configuration it
+     * manages via DnsManager stays in sync with servers set through
+     * {@link EthernetConfigStore#setDnsServers}.
+     */
+    void updateLinkPropertiesDns(@NonNull final String iface,
+            @NonNull final List<InetAddress> servers) {
+        final NetworkInterfaceState state = mTrackingInterfaces.get(iface);
+        if (state == null) return;
+        state.mLinkProperties.setDnsServers(servers);
+        if (state.mNetworkAgent != null) {
+            state.mNetworkAgent.sendLinkPropertiesImpl(state.mLinkProperties);
+        }
+    }
+
+    /**
+     * Returns the DNS servers currently programmed on the network of the given interface, or
+     * an empty list if the interface is not tracked.
+     */
+    @NonNull
+    List<String> getDnsServers(@NonNull final String iface) {
+        final NetworkInterfaceState state = mTrackingInterfaces.get(iface);
+        if (state == null || state.mLinkProperties == null) return Collections.emptyList();
+        final List<InetAddress> dnses = state.mLinkProperties.getDnsServers();
+        if (dnses.isEmpty()) return Collections.emptyList();
+        final List<String> result = new ArrayList<>(dnses.size());
+        for (final InetAddress dns : dnses) {
+            if (dns != null) {
+                result.add(dns.getHostAddress());
+            }
+        }
+        return result;
     }
 
     /** Returns the TrackingReason or an empty EnumSet if the interface does not exist */

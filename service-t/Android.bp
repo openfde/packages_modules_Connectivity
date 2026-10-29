@@ -71,6 +71,7 @@ java_library {
         // or in service-connectivity. They are not necessary (included via
         // service-connectivity-pre-jarjar), and in the case of code that is already in
         // framework-connectivity, the classes would be included in the apex twice.
+        "dnsresolver_aidl_interface-V17-java",
         "modules-utils-statemachine",
         "service-connectivity-tiramisu-protos",
     ],
