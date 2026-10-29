@@ -82,12 +82,14 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 /**
@@ -340,10 +342,16 @@ public class EthernetTracker {
         this(context, handler, factory, netd, new Dependencies());
     }
 
-    @VisibleForTesting
     EthernetTracker(@NonNull final Context context, @NonNull final Handler handler,
             @NonNull final EthernetNetworkFactory factory, @NonNull final INetd netd,
             @NonNull final Dependencies deps) {
+        this(context, handler, factory, netd, deps, new EthernetConfigStore(context));
+    }
+
+    @VisibleForTesting
+    EthernetTracker(@NonNull final Context context, @NonNull final Handler handler,
+            @NonNull final EthernetNetworkFactory factory, @NonNull final INetd netd,
+            @NonNull final Dependencies deps, @NonNull final EthernetConfigStore configStore) {
         mContext = context;
         mHandler = handler;
         mFactory = factory;
@@ -373,7 +381,8 @@ public class EthernetTracker {
         */
 
         mIfaceMatch = Pattern.compile("(usb|eth)\\d+");
-        mConfigStore = new EthernetConfigStore();
+        //mConfigStore = new EthernetConfigStore();
+        mConfigStore = configStore;
         mNetlinkMonitor = new EthernetNetlinkMonitor(mHandler);
     }
 
@@ -414,6 +423,48 @@ public class EthernetTracker {
             @NonNull final IpConfiguration ipConfig) {
         mConfigStore.write(iface, ipConfig);
         mIpConfigurations.put(iface, ipConfig);
+    }
+
+    /**
+     * Set DNS servers for the given interface and, if it currently has a connected network,
+     * push them to the DNS resolver immediately. The new servers are also persisted so they
+     * survive reboots and network reprovisioning.
+     */
+    void setDnsServers(@NonNull final String iface, @NonNull final List<InetAddress> servers) {
+        if (DBG) {
+            Log.i(TAG, "setDnsServers, iface: " + iface + ", servers: " + servers);
+        }
+        mHandler.post(() -> {
+            final int netId = mFactory.getNetId(iface);
+            // Keep LinkProperties in sync so that DnsManager does not overwrite the new
+            // servers on its next configuration update for this network.
+            mFactory.updateLinkPropertiesDns(iface, servers);
+            mConfigStore.setDnsServers(iface, netId, servers);
+            broadcastInterfaceStateChange(iface, getInterfaceTrackingReason(iface));
+        });
+    }
+
+    /**
+     * Get the DNS servers in use for the given interface.
+     *
+     * Returns the DNS servers currently programmed on the interface's network (which are the
+     * ones handed to the DNS resolver), and falls back to the persisted configuration when
+     * the interface has no connected network or no DNS server programmed yet.
+     */
+    @NonNull
+    List<String> getDnsServers(@NonNull final String iface) {
+        final AtomicReference<List<String>> serversRef =
+                new AtomicReference<>(Collections.emptyList());
+        postAndWaitForRunnable(() -> {
+            // Prefer the servers currently programmed on the network (which are the ones
+            // handed to the DNS resolver by DnsManager), and fall back to the persisted
+            // configuration when the interface has no connected network.
+            final List<String> servers = mFactory.getDnsServers(iface);
+            serversRef.set(servers.isEmpty()
+                    ? mConfigStore.getPersistedDnsServers(iface) : servers);
+        });
+        final List<String> servers = serversRef.get();
+        return servers == null ? Collections.emptyList() : servers;
     }
 
     private IpConfiguration getIpConfigurationForCallback(String iface, int state) {
