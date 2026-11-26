@@ -31,9 +31,11 @@ import android.net.EthernetNetworkUpdateRequest;
 import android.net.IEthernetServiceListener;
 import android.net.INetworkInterfaceOutcomeReceiver;
 import android.net.ITetheredInterfaceCallback;
+import android.net.InetAddresses;
 import android.net.IpConfiguration;
 import android.net.NetworkCapabilities;
 import android.net.NetworkSpecifier;
+import android.net.StaticIpConfiguration;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.util.Log;
@@ -46,6 +48,9 @@ import com.android.server.BaseEthernetServiceImpl;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -128,6 +133,63 @@ public class EthernetServiceImpl extends BaseEthernetServiceImpl {
         // TODO: this does not check proxy settings, gateways, etc.
         // Fix this by making IpConfiguration a complete representation of static configuration.
         mTracker.updateIpConfiguration(iface, new IpConfiguration(config));
+    }
+
+    /**
+     * Set DNS servers for the given ethernet interface.
+     *
+     * The legacy implementation only persists the new servers in the stored configuration:
+     * they are applied the next time the interface is provisioned.
+     */
+    @Override
+    public void setDnsServers(String iface, List<String> servers) {
+        throwIfEthernetNotStarted();
+
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.NETWORK_SETTINGS, TAG);
+        if (mTracker.isRestrictedInterface(iface)) {
+            PermissionUtils.enforceRestrictedNetworkPermission(mContext, TAG);
+        }
+        if (servers == null || servers.isEmpty()) {
+            throw new IllegalArgumentException("DNS server list must not be empty");
+        }
+        final IpConfiguration oldConfig = mTracker.getIpConfiguration(iface);
+        if (oldConfig == null) {
+            throw new IllegalArgumentException("No configuration for interface " + iface);
+        }
+        final IpConfiguration newConfig = new IpConfiguration(oldConfig);
+        if (newConfig.getStaticIpConfiguration() == null) {
+            newConfig.setStaticIpConfiguration(new StaticIpConfiguration());
+        }
+        newConfig.getStaticIpConfiguration().dnsServers.clear();
+        for (final String server : servers) {
+            newConfig.getStaticIpConfiguration()
+                    .dnsServers.add(InetAddresses.parseNumericAddress(server));
+        }
+        mTracker.updateIpConfiguration(iface, newConfig);
+    }
+
+    /**
+     * Get the DNS servers persisted for the given ethernet interface.
+     */
+    @Override
+    public List<String> getDnsServers(String iface) {
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.NETWORK_SETTINGS, TAG);
+        if (mTracker.isRestrictedInterface(iface)) {
+            PermissionUtils.enforceRestrictedNetworkPermission(mContext, TAG);
+        }
+        final IpConfiguration config = mTracker.getIpConfiguration(iface);
+        if (config == null || config.getStaticIpConfiguration() == null) {
+            return Collections.emptyList();
+        }
+        final ArrayList<String> result = new ArrayList<>();
+        for (final InetAddress server : config.getStaticIpConfiguration().dnsServers) {
+            if (server != null) {
+                result.add(server.getHostAddress());
+            }
+        }
+        return result;
     }
 
     /**

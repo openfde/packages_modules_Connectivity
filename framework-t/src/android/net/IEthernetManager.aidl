@@ -35,6 +35,8 @@ interface IEthernetManager
     String[] getAvailableInterfaces();
     IpConfiguration getConfiguration(String iface);
     void setConfiguration(String iface, in IpConfiguration config);
+    void setDnsServers(String iface, in List<String> servers);
+    List<String> getDnsServers(String iface);
     boolean isAvailable(String iface);
     void addListener(in IEthernetServiceListener listener, int flags);
     void removeListener(in IEthernetServiceListener listener);

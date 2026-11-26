@@ -157,5 +157,16 @@ flag {
 }
 
 #
+# Ethernet flags
+#
+
+flag {
+    name: "ethernet_set_dns_servers"
+    namespace: "com_android_tethering"
+    description: "Flag for EthernetManager API to get/set DNS servers on an ethernet interface"
+    bug: "170729553"
+}
+
+#
 # Add other sections with 3 lines of comments to avoid merge conflicts
 #
